@@ -68,18 +68,20 @@ AGV 内网 (192.168.1.x)          外网 (10.18.64.x)
 
 ## 部署步骤
 
-### 1. 修改 Launch 文件中的 IP 地址
+### 1. 修改 Launch 文件中的配置
 
-**master.launch.py** — `PEER_IP` 填 slave 侧路由器 WAN 口 IP：
+**master.launch.py** — 修改 `_NETWORK_INTERFACE` 和 `_PEER_ADDRESS`：
 
 ```python
-PEER_IP = "192.168.1.1"  # 替换为 Router A 的 WAN 口 IP
+_NETWORK_INTERFACE = "eth0"
+_PEER_ADDRESS = "192.168.1.1:7000"   # 替换为 slave 侧路由器 WAN IP:端口
 ```
 
-**slave.launch.py** — `PEER_IP` 填 master 的实际 IP：
+**slave.launch.py** — 修改 `_NETWORK_INTERFACE` 和 `_PEER_ADDRESS`：
 
 ```python
-PEER_IP = "10.18.64.1"  # 替换为 master 的实际 IP
+_NETWORK_INTERFACE = "eth0"
+_PEER_ADDRESS = "10.18.64.1:7000"    # 替换为 master 的实际 IP:端口
 ```
 
 ### 2. 配置 NAT 转发规则
@@ -99,21 +101,19 @@ colcon build --packages-select dds_cross_subnet_test
 
 ### 4. 启动节点
 
-**Master 侧：**
+**Master 侧（外网，10.18.64.x）：**
 
 ```bash
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ros2 launch dds_cross_subnet_test master.launch.py
 ```
 
-**Slave 侧：**
+**Slave 侧（AGV，192.168.1.x）：**
 
 ```bash
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ros2 launch dds_cross_subnet_test slave.launch.py
 ```
 
