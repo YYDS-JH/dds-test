@@ -19,7 +19,8 @@ from launch_ros.actions import Node
 
 # ── 部署前修改此处的配置 ──────────────────────────────────────────────────────
 _NETWORK_INTERFACE = "enp2s0"
-_PEER_ADDRESS = "10.18.16.30:7000"          # master 的地址:端口（master PI=0，端口=7000）
+_PEER_ADDRESS = "10.18.20.42:7000"          # master 的地址:端口
+_EXTERNAL_ADDRESS = "10.18.21.23:7000"      # 本机对外宣告的公网地址（路由器 WAN IP:端口）
 
 # ── CycloneDDS 内联配置 ────────────────────────────────────────────────────────
 _CYCLONEDDS_XML = f"""\
@@ -34,9 +35,10 @@ _CYCLONEDDS_XML = f"""\
         <NetworkInterface name="{_NETWORK_INTERFACE}" multicast="false"/>
       </Interfaces>
       <AllowMulticast>false</AllowMulticast>
+      <ExternalNetworkAddress>{_EXTERNAL_ADDRESS}</ExternalNetworkAddress>
     </General>
     <Discovery>
-      <ParticipantIndex>1</ParticipantIndex>
+      <ParticipantIndex>0</ParticipantIndex>
       <Peers>
         <Peer Address="{_PEER_ADDRESS}"/>
       </Peers>
@@ -45,6 +47,7 @@ _CYCLONEDDS_XML = f"""\
         <DomainGain>0</DomainGain>
         <ParticipantGain>1</ParticipantGain>
         <UnicastMetaOffset>0</UnicastMetaOffset>
+        <UnicastDataOffset>0</UnicastDataOffset>
       </Ports>
     </Discovery>
     <Internal>

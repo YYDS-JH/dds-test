@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """
-Master 侧启动文件（外网，10.18.64.x）
+Master 侧多节点启动文件（外网，3 个节点: node_0, node_1, node_2）
 
 用法:
-  ros2 launch dds_cross_subnet_test master.launch.py
+  ros2 launch dds_multi_node_test multi_master.launch.py
 
-中间件: CycloneDDS（rmw_cyclonedds_cpp），配置内联于本文件
-
-端口规则（固定 ParticipantIndex=0）:
-  Discovery Port = 7000（Base）+ 0（DomainGain×0）+ 1×0（ParticipantGain×PI）+ 0（MetaOffset）
+每个节点发布 /n<N>_topic，订阅其他 5 个 topic，1Hz
 """
 
 import tempfile
@@ -19,10 +16,18 @@ from launch_ros.actions import Node
 
 # ── 部署前修改此处的配置 ──────────────────────────────────────────────────────
 _NETWORK_INTERFACE = "wlp3s0"
-_PEER_ADDRESS = "10.18.21.23:7000"        # slave 的地址:端口
-_EXTERNAL_ADDRESS = "10.18.20.42:7000"    # 本机对外宣告的公网地址（本机 IP:端口）
+_EXTERNAL_ADDRESS = "10.18.20.42"             # master 侧公网 IP（不写端口）
+_NODE_COUNT = 3
+_PEER_PORTS = "7000,7001,7002"                # slave 侧 3 个端口
+_PEER_IP = "10.18.21.23"                       # slave 侧公网 IP
 
-# ── CycloneDDS 内联配置 ────────────────────────────────────────────────────────
+# ── CycloneDDS XML（同一主机 3 个节点共用，PI=auto 自动分配 0/1/2）────────────
+_PORT_BASE = 7000
+_PEER_XML = "\n".join(
+    f'        <Peer Address="{_PEER_IP}:{p}"/>'
+    for p in _PEER_PORTS.split(",")
+)
+
 _CYCLONEDDS_XML = f"""\
 <?xml version="1.0" encoding="UTF-8" ?>
 <CycloneDDS xmlns="https://cdds.io/config"
@@ -38,12 +43,13 @@ _CYCLONEDDS_XML = f"""\
       <ExternalNetworkAddress>{_EXTERNAL_ADDRESS}</ExternalNetworkAddress>
     </General>
     <Discovery>
-      <ParticipantIndex>0</ParticipantIndex>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>{_NODE_COUNT}</MaxAutoParticipantIndex>
       <Peers>
-        <Peer Address="{_PEER_ADDRESS}"/>
+{_PEER_XML}
       </Peers>
       <Ports>
-        <Base>7000</Base>
+        <Base>{_PORT_BASE}</Base>
         <DomainGain>0</DomainGain>
         <ParticipantGain>1</ParticipantGain>
         <UnicastMetaOffset>0</UnicastMetaOffset>
@@ -64,10 +70,10 @@ _CYCLONEDDS_XML = f"""\
 """
 
 
-def _write_cyclonedds_config() -> str:
+def _write_config() -> str:
     tmp = tempfile.NamedTemporaryFile(
         mode='w',
-        prefix='cyclonedds_dds_test_master_',
+        prefix='cyclonedds_multi_master_',
         suffix='.xml',
         delete=False,
     )
@@ -78,18 +84,24 @@ def _write_cyclonedds_config() -> str:
 
 
 def generate_launch_description():
-    cyclonedds_xml_path = _write_cyclonedds_config()
+    xml_path = _write_config()
+
+    # 3 个节点，索引 0,1,2
+    nodes = []
+    for i in range(_NODE_COUNT):
+        nodes.append(Node(
+            package='dds_multi_node_test',
+            executable='multi_node',
+            name=f'node_{i}',
+            output='screen',
+            parameters=[{
+                'node_index': i,
+                'total_nodes': 6,
+                'node_name': f'node_{i}',
+            }],
+        ))
 
     return LaunchDescription([
         SetEnvironmentVariable('RMW_IMPLEMENTATION', 'rmw_cyclonedds_cpp'),
-        SetEnvironmentVariable(
-            'CYCLONEDDS_URI',
-            'file://' + cyclonedds_xml_path,
-        ),
-        Node(
-            package='dds_cross_subnet_test',
-            executable='master_node',
-            name='master_node',
-            output='screen',
-        ),
-    ])
+        SetEnvironmentVariable('CYCLONEDDS_URI', 'file://' + xml_path),
+    ] + nodes)
