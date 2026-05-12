@@ -17,10 +17,13 @@ int main(int argc, char** argv) {
   auto subscription =
       node->create_subscription<std_msgs::msg::String>(
           "/master_to_slave", qos,
-          [detector](std_msgs::msg::String::ConstSharedPtr msg) {
+          [node, detector](std_msgs::msg::String::ConstSharedPtr msg) {
             std::uint64_t seq = 0;
             if (dds_test::parse_seq(msg->data, seq)) {
+              RCLCPP_INFO(node->get_logger(), "received seq=%lu", seq);
               detector->on_receive(seq);
+            } else {
+              RCLCPP_INFO(node->get_logger(), "received: '%s'", msg->data.c_str());
             }
           });
 

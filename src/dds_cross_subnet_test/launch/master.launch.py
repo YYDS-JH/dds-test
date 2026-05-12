@@ -6,6 +6,9 @@ Master 侧启动文件（外网，10.18.64.x）
   ros2 launch dds_cross_subnet_test master.launch.py
 
 中间件: CycloneDDS（rmw_cyclonedds_cpp），配置内联于本文件
+
+端口规则（固定 ParticipantIndex=0）:
+  Discovery Port = 7000（Base）+ 0（DomainGain×0）+ 1×0（ParticipantGain×PI）+ 0（MetaOffset）
 """
 
 import tempfile
@@ -16,7 +19,7 @@ from launch_ros.actions import Node
 
 # ── 部署前修改此处的配置 ──────────────────────────────────────────────────────
 _NETWORK_INTERFACE = "enp2s0"
-_PEER_ADDRESS = "192.168.1.1:7000"        # slave 侧路由器 WAN IP:端口
+_PEER_ADDRESS = "10.18.16.30:7001"        # slave 的地址:端口（slave PI=1，端口=7001）
 
 # ── CycloneDDS 内联配置 ────────────────────────────────────────────────────────
 _CYCLONEDDS_XML = f"""\
@@ -33,11 +36,16 @@ _CYCLONEDDS_XML = f"""\
       <AllowMulticast>false</AllowMulticast>
     </General>
     <Discovery>
-      <ParticipantIndex>auto</ParticipantIndex>
-      <MaxAutoParticipantIndex>50</MaxAutoParticipantIndex>
+      <ParticipantIndex>0</ParticipantIndex>
       <Peers>
         <Peer Address="{_PEER_ADDRESS}"/>
       </Peers>
+      <Ports>
+        <Base>7000</Base>
+        <DomainGain>0</DomainGain>
+        <ParticipantGain>1</ParticipantGain>
+        <UnicastMetaOffset>0</UnicastMetaOffset>
+      </Ports>
     </Discovery>
     <Internal>
       <Watermarks>
