@@ -23,7 +23,13 @@ _PEER_IP = "10.18.21.23"                       # slave 侧公网 IP
 
 # ── CycloneDDS XML（同一主机 3 个节点共用，PI=auto 自动分配 0/1/2）────────────
 _PORT_BASE = 7000
+
+# Peers: localhost + remote slave (all 3 ports each)
+_LOCAL_PEER_PORTS = "7000,7001,7002"
 _PEER_XML = "\n".join(
+    f'        <Peer Address="127.0.0.1:{p}"/>'
+    for p in _LOCAL_PEER_PORTS.split(",")
+) + "\n" + "\n".join(
     f'        <Peer Address="{_PEER_IP}:{p}"/>'
     for p in _PEER_PORTS.split(",")
 )
@@ -86,18 +92,20 @@ def _write_config() -> str:
 def generate_launch_description():
     xml_path = _write_config()
 
-    # 3 个节点，索引 0,1,2
+    # 3 个节点，索引 0,1,2 → m1,m2,m3
+    _ALL_NAMES = ['m1', 'm2', 'm3', 's1', 's2', 's3']
     nodes = []
     for i in range(_NODE_COUNT):
         nodes.append(Node(
             package='dds_multi_node_test',
             executable='multi_node',
-            name=f'node_{i}',
+            name=_ALL_NAMES[i],
             output='screen',
             parameters=[{
                 'node_index': i,
                 'total_nodes': 6,
-                'node_name': f'node_{i}',
+                'node_name': _ALL_NAMES[i],
+                'node_names': _ALL_NAMES,
             }],
         ))
 

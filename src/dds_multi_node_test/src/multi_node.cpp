@@ -48,6 +48,7 @@ int main(int argc, char** argv) {
   auto idx = node->get_parameter("node_index").as_int();
   auto total = node->get_parameter("total_nodes").as_int();
   auto name = node->get_parameter("node_name").as_string();
+  auto names = node->declare_parameter("node_names", std::vector<std::string>{});
 
   auto qos = rclcpp::QoS(rclcpp::KeepLast(10)).reliable().durability_volatile();
 
@@ -64,14 +65,15 @@ int main(int argc, char** argv) {
     auto sub_topic = "/n" + std::to_string(i) + "_topic";
     auto sub = node->create_subscription<std_msgs::msg::String>(
         sub_topic, qos,
-        [node, name, i](std_msgs::msg::String::ConstSharedPtr msg) {
+        [node, name, i, &names](std_msgs::msg::String::ConstSharedPtr msg) {
           std::uint64_t seq = 0;
+          auto src_name = (i < (int)names.size()) ? names[i] : ("n" + std::to_string(i));
           if (parse_seq(msg->data, seq)) {
             RCLCPP_INFO(node->get_logger(),
-                        "[%s] recv from n%d seq=%lu", name.c_str(), i, seq);
+                        "[%s] recv from %s seq=%lu", name.c_str(), src_name.c_str(), seq);
           } else {
             RCLCPP_INFO(node->get_logger(),
-                        "[%s] recv from n%d: '%s'", name.c_str(), i,
+                        "[%s] recv from %s: '%s'", name.c_str(), src_name.c_str(),
                         msg->data.c_str());
           }
         });

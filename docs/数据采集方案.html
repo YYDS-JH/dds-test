@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无本体数据采集系统方案</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #d2991d;
+    --red: #f85149;
+    --purple: #a371f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6; padding: 40px 20px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; }
+
+  h1 { font-size: 28px; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 8px; }
+  h1 .sub { font-size: 14px; color: var(--muted); font-weight: normal; display: block; margin-top: 4px; }
+  h2 { font-size: 20px; margin: 40px 0 16px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 16px; margin: 24px 0 12px; color: var(--accent); }
+
+  p, li { margin-bottom: 8px; }
+  ul, ol { padding-left: 24px; margin-bottom: 12px; }
+  code { background: var(--surface); padding: 2px 6px; border-radius: 4px; font-size: 13px; border: 1px solid var(--border); }
+  pre { background: var(--surface); padding: 16px; border-radius: 6px; border: 1px solid var(--border); overflow-x: auto; font-size: 13px; margin: 12px 0; }
+
+  /* Architecture diagram */
+  .arch { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 32px 24px 24px; margin: 20px 0; }
+  .arch-row { display: flex; justify-content: center; align-items: center; gap: 0; margin-bottom: 16px; flex-wrap: wrap; }
+  .arch-label { text-align: center; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
+  .arch-box {
+    background: var(--bg); border: 1.5px solid var(--accent); border-radius: 8px;
+    padding: 14px 20px; text-align: center; min-width: 140px;
+  }
+  .arch-box.master { border-color: var(--purple); }
+  .arch-box.periph { border-color: var(--green); }
+  .arch-box.server { border-color: var(--orange); }
+  .arch-box h4 { font-size: 14px; margin-bottom: 4px; }
+  .arch-box p { font-size: 12px; color: var(--muted); margin: 0; }
+  .arch-arrow { font-size: 24px; color: var(--muted); padding: 0 8px; }
+  .arch-bus { font-size: 11px; color: var(--orange); display: block; margin-top: 4px; }
+  .arch-wifi { display: flex; justify-content: center; align-items: center; gap: 12px; margin: 12px 0; padding: 8px; border: 1px dashed var(--border); border-radius: 6px; }
+  .arch-wifi::before { content: "WiFi LAN"; font-size: 11px; color: var(--muted); margin-right: 8px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 14px; }
+  th { background: var(--surface); text-align: left; padding: 8px 12px; border: 1px solid var(--border); font-weight: 600; }
+  td { padding: 8px 12px; border: 1px solid var(--border); }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.01); }
+
+  /* Stats grid */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 16px 0; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .stat-card .value { font-size: 24px; font-weight: 700; color: var(--accent); }
+  .stat-card .label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* Timeline */
+  .timeline { position: relative; padding: 16px 0 16px 32px; border-left: 2px solid var(--border); margin: 16px 0; }
+  .timeline-step { position: relative; margin-bottom: 20px; }
+  .timeline-step::before {
+    content: ""; position: absolute; left: -40px; top: 4px;
+    width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg);
+  }
+  .timeline-step h4 { font-size: 14px; margin-bottom: 2px; }
+  .timeline-step p { font-size: 13px; color: var(--muted); margin: 0; }
+
+  /* API */
+  .api-endpoint { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; margin: 8px 0; }
+  .api-endpoint .method { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 700; margin-right: 8px; }
+  .method.post { background: var(--green); color: #000; }
+  .method.get { background: var(--accent); color: #000; }
+  .api-endpoint .path { font-family: monospace; font-size: 14px; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .arch-row { flex-direction: column; }
+    .arch-arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>无本体数据采集系统方案
+  <span class="sub">人类穿戴传感器设备直接采集 · 5 硬件模块 · WiFi + 485 混合拓扑 · NTP 时间同步 · MCAP 数据合并</span>
+</h1>
+
+<!-- ============================================================ -->
+<h2>1. 系统概览</h2>
+
+<p>本系统由 <strong>5 个硬件设备</strong>组成，由人直接穿戴完成数据采集（无机器人本体）。设备分为三个逻辑采集节点：<strong>ego 头环</strong>、<strong>左手腕相机模组</strong>、<strong>右手腕相机模组</strong>。采集完成后数据通过 WiFi 局域网上传至服务器，按时间戳对齐合并为统一数据集。</p>
+
+<h3>1.1 架构总览</h3>
+<div class="arch">
+
+  <div class="arch-label">采集节点（3 个嵌入式 Linux 板卡）</div>
+  <div class="arch-row">
+    <div class="arch-box master">
+      <h4>🧠 ego 头环</h4>
+      <p>4× RGB 相机 + IMU</p>
+      <p style="margin-top:4px;font-size:11px;">Jetson / 树莓派</p>
+    </div>
+  </div>
+
+  <div class="arch-row" style="gap: 48px;">
+    <div class="arch-box periph">
+      <h4>🤚 左手腕相机模组</h4>
+      <p>1× RGB 相机</p>
+      <span class="arch-bus">── RS-485 ── 左手外骨骼</span>
+    </div>
+    <div class="arch-box periph">
+      <h4>🤚 右手腕相机模组</h4>
+      <p>1× RGB 相机</p>
+      <span class="arch-bus">── RS-485 ── 右手外骨骼</span>
+    </div>
+  </div>
+
+  <div class="arch-wifi">
+    <span style="font-size:13px;color:var(--text);">头环 · 左腕 · 右腕</span>
+    <span style="font-size:12px;color:var(--muted);">（三节点通过 WiFi LAN 互联）</span>
+  </div>
+
+  <div class="arch-row" style="gap: 48px; margin-top: 16px;">
+    <div class="arch-box server">
+      <h4>🕐 NTP 时间服务器</h4>
+      <p>独立主机</p>
+    </div>
+    <div class="arch-box server">
+      <h4>📡 数据汇聚服务器</h4>
+      <p>数据上传 + 时间戳对齐合并</p>
+    </div>
+  </div>
+  <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:12px;">
+    NTP 服务器与数据服务器为 <strong>两台独立机器</strong>（非头环），确保时间源可靠性与存储独立性。
+  </p>
+</div>
+
+<!-- ============================================================ -->
+<h2>2. 硬件与传感器规格</h2>
+
+<table>
+  <tr><th>设备</th><th>传感器</th><th>接口</th><th>采样率</th><th>单次数据量</th><th>数据速率</th></tr>
+  <tr>
+    <td rowspan="2"><strong>ego 头环</strong><br><small>嵌入式 Linux</small></td>
+    <td>4× RGB 相机</td><td>CSI / USB</td><td>30 fps</td><td>~50 KB / 帧（JPEG, 640×480）</td><td>4 × 1.5 = <strong>6 MB/s</strong></td>
+  </tr>
+  <tr>
+    <td>6 轴 IMU</td><td>I2C / SPI</td><td>200 Hz</td><td>~24 B / 采样</td><td><strong>4.8 KB/s</strong></td>
+  </tr>
+  <tr>
+    <td><strong>左手腕相机模组</strong><br><small>嵌入式 Linux</small></td>
+    <td>1× RGB 相机</td><td>CSI / USB</td><td>30 fps</td><td>~50 KB / 帧</td><td><strong>1.5 MB/s</strong></td>
+  </tr>
+  <tr>
+    <td><strong>右手腕相机模组</strong><br><small>嵌入式 Linux</small></td>
+    <td>1× RGB 相机</td><td>CSI / USB</td><td>30 fps</td><td>~50 KB / 帧</td><td><strong>1.5 MB/s</strong></td>
+  </tr>
+  <tr>
+    <td><strong>左手外骨骼</strong></td>
+    <td>关节角度（~20 关节）</td><td>RS-485</td><td>100 Hz</td><td>~80 B / 采样</td><td><strong>8 KB/s</strong></td>
+  </tr>
+  <tr>
+    <td><strong>右手外骨骼</strong></td>
+    <td>关节角度（~20 关节）</td><td>RS-485</td><td>100 Hz</td><td>~80 B / 采样</td><td><strong>8 KB/s</strong></td>
+  </tr>
+</table>
+
+<div class="stat-grid">
+  <div class="stat-card"><div class="value">~9 MB/s</div><div class="label">系统总数据速率</div></div>
+  <div class="stat-card"><div class="value">~16.2 GB</div><div class="label">单次采集（30 分钟）总数据量</div></div>
+  <div class="stat-card"><div class="value">~54 GB</div><div class="label">三设备本地存储合计（30 min × 3）</div></div>
+  <div class="stat-card"><div class="value">≥ 64 GB</div><div class="label">每设备建议最小存储空间</div></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>3. 通讯架构</h2>
+
+<h3>3.1 RS-485 总线（外骨骼 ↔ 手腕相机）</h3>
+<p>左右手腕各一条独立 RS-485 总线，手腕相机模组作为主机，外骨骼作为从机。</p>
+<ul>
+  <li><strong>物理层</strong>：RS-485 半双工，波特率 ≥ 921600 bps（外骨骼 8KB/s 远小于带宽上限）</li>
+  <li><strong>协议层</strong>：自定义二进制帧协议（见 <a href="#appendix-a">附录 A</a>），主机轮询、从机应答</li>
+  <li><strong>同步</strong>：外骨骼数据到达后，相机模组以自身系统时钟打时间戳（已通过 NTP 同步）</li>
+</ul>
+
+<h3>3.2 WiFi 局域网（头环 · 左腕 · 右腕 · 服务器）</h3>
+<p>三台采集节点和服务器处于同一 WiFi 局域网（建议 5GHz 频段，802.11ac 或以上）。</p>
+<ul>
+  <li><strong>控制指令</strong>：HTTP（服务器 → 采集节点）</li>
+  <li><strong>数据上传</strong>：HTTP PUT/POST（采集节点 → 服务器），MCAP 文件</li>
+  <li><strong>时间同步</strong>：NTP over UDP（采集节点 → NTP 服务器）</li>
+  <li><strong>带宽</strong>：9 MB/s 控制指令可忽略不计；数据上传为事后批量传输，不对采集过程带宽产生竞争</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2>4. 时间同步方案</h2>
+
+<h3>4.1 NTP 架构</h3>
+<table>
+  <tr><th>角色</th><th>部署位置</th><th>说明</th></tr>
+  <tr><td>NTP Server（stratum 1 或 2）</td><td>局域网内独立主机</td><td>全网时钟基准；不在头环上，避免头环断电导致同步丢失</td></tr>
+  <tr><td>NTP Client</td><td>ego 头环</td><td>chronyd / ntpd，轮询间隔 ≤ 16s</td></tr>
+  <tr><td>NTP Client</td><td>左手腕相机模组</td><td>chronyd / ntpd，轮询间隔 ≤ 16s</td></tr>
+  <tr><td>NTP Client</td><td>右手腕相机模组</td><td>chronyd / ntpd，轮询间隔 ≤ 16s</td></tr>
+</table>
+
+<h3>4.2 同步精度</h3>
+<ul>
+  <li>WiFi 局域网环境下 NTP 典型精度：<strong>1–10 ms</strong></li>
+  <li>相机帧间隔 33 ms（30 fps），外骨骼采样间隔 10 ms（100 Hz），IMU 采样间隔 5 ms（200 Hz）</li>
+  <li>结论：毫秒级 NTP 精度满足 <strong>帧级对齐</strong>需求，足够本次应用</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2>5. 采集流程</h2>
+
+<h3>5.1 采集生命周期</h3>
+<div class="timeline">
+  <div class="timeline-step">
+    <h4>① 准备阶段</h4>
+    <p>三台设备开机，自动连接 WiFi，chronyd 与 NTP 服务器完成同步（通常在启动后 1–2 分钟内达到稳定精度）。设备本地 HTTP server 启动，监听控制端口（如 8080）。</p>
+  </div>
+  <div class="timeline-step">
+    <h4>② 启动指令</h4>
+    <p>服务器向三台设备分别 POST /start，Body 携带目标开始时间戳（服务器当前时间 + 50ms 延迟，吸收网络抖动）。三台设备收到后各自返回 200 OK 确认。</p>
+  </div>
+  <div class="timeline-step">
+    <h4>③ 采集进行中</h4>
+    <p>到达指定时间戳后，三台设备同步开始记录。每台设备以自身 NTP 同步的系统时钟为每条传感器数据打时间戳，写入本地 MCAP 文件。服务器可随时通过 GET /status 查询运行状态和已写入数据量。</p>
+  </div>
+  <div class="timeline-step">
+    <h4>④ 停止指令</h4>
+    <p>服务器向三台设备 POST /stop，同样携带目标停止时间戳。各设备按指定时间停止，关闭 MCAP 文件。</p>
+  </div>
+  <div class="timeline-step">
+    <h4>⑤ 数据上传</h4>
+    <p>采集结束后，服务器向每台设备 POST /upload 或各设备主动推送 MCAP 文件到服务器指定路径。上传完毕返回 200。</p>
+  </div>
+  <div class="timeline-step">
+    <h4>⑥ 数据合并</h4>
+    <p>服务器收集三个 MCAP 文件，按时间戳对齐所有 channel，产出统一数据集（详见第 6 节）。</p>
+  </div>
+</div>
+
+<h3>5.2 本地存储与 MCAP 结构</h3>
+<p>每台采集节点在本地磁盘写入一个 MCAP 文件，包含该节点负责的所有传感器 channel：</p>
+
+<table>
+  <tr><th>采集节点</th><th>MCAP Channel</th><th>数据类型</th></tr>
+  <tr><td rowspan="5"><strong>ego 头环</strong></td><td>/headset/cam0</td><td>sensor_msgs/CompressedImage</td></tr>
+  <tr><td>/headset/cam1</td><td>sensor_msgs/CompressedImage</td></tr>
+  <tr><td>/headset/cam2</td><td>sensor_msgs/CompressedImage</td></tr>
+  <tr><td>/headset/cam3</td><td>sensor_msgs/CompressedImage</td></tr>
+  <tr><td>/headset/imu</td><td>sensor_msgs/Imu</td></tr>
+  <tr><td rowspan="2"><strong>左手腕相机模组</strong></td><td>/left_wrist/cam</td><td>sensor_msgs/CompressedImage</td></tr>
+  <tr><td>/left_wrist/exo_joints</td><td>自定义 JointState</td></tr>
+  <tr><td rowspan="2"><strong>右手腕相机模组</strong></td><td>/right_wrist/cam</td><td>sensor_msgs/CompressedImage</td></tr>
+  <tr><td>/right_wrist/exo_joints</td><td>自定义 JointState</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>6. 数据整合</h2>
+
+<h3>6.1 服务器端合并流程</h3>
+<ol>
+  <li>收集三个 .mcap 文件到服务器</li>
+  <li>打开所有 channel，读取每条消息的 <strong>log_time</strong>（NTP 同步后的时间戳）</li>
+  <li>以 <strong>时间戳为键，执行多文件归并排序</strong>（k-way merge），输出统一的时序数据集</li>
+  <li>合并后的数据集提供两种视图：
+    <ul>
+      <li><strong>原始流视图</strong>：所有 channel 按时间交错，保留完整原始数据</li>
+      <li><strong>对齐帧视图</strong>：以相机帧时间戳为基准（30 fps），将最近邻的外骨骼和 IMU 数据与之对齐</li>
+    </ul>
+  </li>
+</ol>
+
+<h3>6.2 时间戳筛选</h3>
+<p>由于三台设备的启动和停止严格对齐在同一时间戳，合并时可直接以 <strong>采集窗口 [T_start, T_stop]</strong> 作为有效区间，不在区间内的数据视为无效并丢弃。</p>
+
+<!-- ============================================================ -->
+<h2>7. 控制协议</h2>
+
+<h3>7.1 设备端 HTTP API</h3>
+<p>每台采集节点在端口 <code>8080</code> 上启动一个轻量 HTTP server，提供以下端点：</p>
+
+<div class="api-endpoint">
+  <span class="method post">POST</span>
+  <span class="path">/start</span>
+  <p style="margin-top:8px;font-size:13px;">启动采集。Body 为 JSON：<code>{"start_time_ns": 1715600000050000000}</code> — 目标开始时间戳（Unix 纳秒）。设备收到后设置定时器，到达时间戳后开始写入 MCAP。返回 <code>200 OK</code> 或 <code>409 Conflict</code>（已在采集）。</p>
+</div>
+
+<div class="api-endpoint">
+  <span class="method post">POST</span>
+  <span class="path">/stop</span>
+  <p style="margin-top:8px;font-size:13px;">停止采集。Body 为 JSON：<code>{"stop_time_ns": 1715601800050000000}</code> — 目标停止时间戳。到达后关闭 MCAP 文件。返回 <code>200 OK</code>。</p>
+</div>
+
+<div class="api-endpoint">
+  <span class="method get">GET</span>
+  <span class="path">/status</span>
+  <p style="margin-top:8px;font-size:13px;">查询运行状态。返回 JSON：<code>{"recording": true, "elapsed_s": 127.3, "bytes_written": 1145000000, "channels": ["/headset/cam0", ...]}</code>。</p>
+</div>
+
+<div class="api-endpoint">
+  <span class="method get">GET</span>
+  <span class="path">/download</span>
+  <p style="margin-top:8px;font-size:13px;">下载本次采集的 MCAP 文件。服务器主动发起 GET 拉取，或在 /stop 完成后由设备 POST 推送到服务器指定路径。</p>
+</div>
+
+<h3>7.2 可靠性与重试</h3>
+<p>服务器在发送 /start 或 /stop 时，如未收到 200 OK（超时 2 秒），执行重试：<strong>最多 3 次，间隔 200 ms</strong>。任一设备 3 次重试后仍未确认，<strong>本次采集取消</strong>并报告操作者。</p>
+
+<!-- ============================================================ -->
+<h2>8. 故障处理</h2>
+
+<table>
+  <tr><th>故障场景</th><th>影响</th><th>应对</th></tr>
+  <tr>
+    <td>某设备未响应 /start</td>
+    <td>该设备未开始录制，数据缺失一个节点</td>
+    <td>重试 3 次后告警，操作者判断是否继续</td>
+  </tr>
+  <tr>
+    <td>采集期间 WiFi 断开</td>
+    <td>NTP 同步丢失，时钟逐渐漂移；HTTP 状态查询不可用</td>
+    <td>本地存储不受影响；采集结束后设备重新联网再上传</td>
+  </tr>
+  <tr>
+    <td>采集期间某设备掉电</td>
+    <td>该设备数据丢失（未刷盘部分）</td>
+    <td>MCAP 定期刷盘（每 5 秒 fsync），减少丢失量</td>
+  </tr>
+  <tr>
+    <td>NTP 服务器故障</td>
+    <td>三台设备时钟开始漂移</td>
+    <td>chronyd fallback 到本地时钟（stratum 10）；采集前检查同步状态</td>
+  </tr>
+  <tr>
+    <td>存储空间不足</td>
+    <td>写入失败，数据截断</td>
+    <td>采集前通过 /status 检查可用空间并告警；采集期间空间不足时停止并保留已写入数据</td>
+  </tr>
+  <tr>
+    <td>数据上传失败</td>
+    <td>服务器缺少部分 MCAP 文件</td>
+    <td>本地保留 MCAP 副本，支持手动重新上传或通过 USB 备份导出</td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>9. 数据流总览</h2>
+
+<pre>
+  ┌─────────────────────────────────────────────────────────────┐
+  │                        采集阶段                              │
+  │                                                             │
+  │  左手外骨骼 ──485──▶ 左手腕相机 ──▶ 本地 MCAP                │
+  │  右手外骨骼 ──485──▶ 右手腕相机 ──▶ 本地 MCAP                │
+  │  ego头环(4×RGB+IMU) ──────────▶ 本地 MCAP                   │
+  │                                                             │
+  │  ◀── NTP Server 持续同步三台设备时钟 ──▶                     │
+  │  ◀── 数据服务器 采集前发 /start，采集后发 /stop ──▶          │
+  └──────────────────────────┬──────────────────────────────────┘
+                             │
+                             ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │                       上传 & 合并阶段                        │
+  │                                                             │
+  │  头环 ──HTTP──▶                                          │
+  │  左腕 ──HTTP──▶   数据服务器   ──▶  按时间戳 k-way merge    │
+  │  右腕 ──HTTP──▶                ──▶  统一数据集              │
+  └─────────────────────────────────────────────────────────────┘
+</pre>
+
+<!-- ============================================================ -->
+<h2>附录 A：RS-485 外骨骼通信帧协议</h2>
+
+<p>二进制帧格式（主机轮询，从机应答）：</p>
+
+<pre>
+  请求帧（主机 → 外骨骼）：         应答帧（外骨骼 → 主机）：
+  ┌─────┬──────┬──────┐           ┌─────┬──────┬─────────┬──────┐
+  │ SOH │ CMD  │ CRC8 │           │ SOH │ LEN  │  DATA   │ CRC8 │
+  │ 1B  │ 1B   │ 1B   │           │ 1B  │ 1B   │ N Bytes │ 1B   │
+  └─────┴──────┴──────┘           └─────┴──────┴─────────┴──────┘
+  SOH = 0xA5                       SOH = 0xA5
+  CMD = 0x01 (读关节数据)          LEN = 关节数 × 4B (float32)
+                                   DATA = [关节0, 关节1, ...] (小端)
+</pre>
+
+</div>
+</body>
+</html>
